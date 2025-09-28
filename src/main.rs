@@ -1,4 +1,5 @@
-use anyhow::{Context, Result};
+use anyhow::Result;
+use core::panic;
 use std::io::{Read, Write};
 use std::{fs, io};
 
@@ -62,7 +63,7 @@ impl Interpreter {
     }
 }
 
-fn interpret(content: String) -> Result<()> {
+fn interpret(content: String) {
     let mut interp = Interpreter::new();
     let mut bstack = Vec::<usize>::new();
 
@@ -89,10 +90,18 @@ fn interpret(content: String) -> Result<()> {
             b'<' => interp.shift_left(),
             b'+' => interp.increase(),
             b'-' => interp.decrease(),
-            b'.' => interp.print()?,
-            b',' => interp.read()?,
+            b'.' => {
+                if interp.print().is_err() {
+                    panic!("Failed to print at position {}", p);
+                }
+            }
+            b',' => {
+                if interp.read().is_err() {
+                    panic!("Failed to read at position {}", p);
+                }
+            }
             b'[' => {
-                let nxt = find_nxt(p).unwrap();
+                let nxt = find_nxt(p).unwrap_or_else(|| panic!("Unmatched '[' at position {}", p));
                 if interp.has_value() {
                     bstack.push(p);
                 } else {
@@ -101,7 +110,9 @@ fn interpret(content: String) -> Result<()> {
             }
             b']' => {
                 if interp.has_value() {
-                    p = *bstack.last().unwrap();
+                    p = *bstack
+                        .last()
+                        .unwrap_or_else(|| panic!("Unmatched ']' at position {}", p));
                 } else {
                     bstack.pop();
                 }
@@ -110,16 +121,16 @@ fn interpret(content: String) -> Result<()> {
         }
         p += 1;
     }
-
-    Ok(())
 }
 
 fn main() -> Result<()> {
     let args = Args::parse();
 
-    let content = fs::read_to_string(&args.file)
-        .with_context(|| format!("Failed to read file: {}", args.file))?;
-    interpret(content)?;
+    if let Ok(content) = fs::read_to_string(&args.file) {
+        interpret(content);
+    } else {
+        panic!("Failed to read file {}", args.file);
+    }
 
     Ok(())
 }
