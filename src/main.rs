@@ -12,8 +12,8 @@ struct Args {
 
 #[derive(Debug)]
 struct Interpreter {
-    tape: [u8; 100000],
     p: usize,
+    tape: [u8; 100000],
     input: io::Stdin,
     output: io::Stdout,
 }
@@ -21,8 +21,8 @@ struct Interpreter {
 impl Interpreter {
     fn new() -> Self {
         Self {
-            tape: [0; 100000],
             p: 0,
+            tape: [0; 100000],
             input: io::stdin(),
             output: io::stdout(),
         }
@@ -56,33 +56,32 @@ impl Interpreter {
         self.tape[self.p] = buf[0];
         Ok(())
     }
-}
 
-struct BMatch {
-    stack: Vec<usize>,
-}
-
-impl BMatch {
-    fn new() -> Self {
-        Self { stack: vec![] }
-    }
-
-    fn push_loop(&mut self, p: &usize) {
-        self.stack.push(*p);
-    }
-
-    fn pop_loop(&mut self) -> usize {
-        self.stack.pop().unwrap()
+    fn has_value(&self) -> bool {
+        self.tape[self.p] != 0
     }
 }
 
 fn interpret(content: String) -> Result<()> {
     let mut interp = Interpreter::new();
-    let mut bmatch = BMatch::new();
+    let mut bstack = Vec::<usize>::new();
 
     let n = content.len();
     let bytes = content.as_bytes();
     let mut p = 0;
+
+    let find_nxt = |mut p| -> Option<usize> {
+        while p < n {
+            match bytes[p] {
+                b']' => {
+                    return Some(p);
+                }
+                _ => {}
+            }
+            p += 1;
+        }
+        None
+    };
 
     while p < n {
         match bytes[p] {
@@ -92,8 +91,21 @@ fn interpret(content: String) -> Result<()> {
             b'-' => interp.decrease(),
             b'.' => interp.print()?,
             b',' => interp.read()?,
-            b'[' => bmatch.push_loop(&p),
-            b']' => p = bmatch.pop_loop().wrapping_sub(1),
+            b'[' => {
+                let nxt = find_nxt(p).unwrap();
+                if interp.has_value() {
+                    bstack.push(p);
+                } else {
+                    p = nxt;
+                }
+            }
+            b']' => {
+                if interp.has_value() {
+                    p = *bstack.last().unwrap();
+                } else {
+                    bstack.pop();
+                }
+            }
             _ => {}
         }
         p += 1;
