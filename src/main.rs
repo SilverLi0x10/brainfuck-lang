@@ -8,7 +8,7 @@ use clap::Parser;
 #[derive(Parser, Debug)]
 #[command(version, about = "Interpreter for brainfuck")]
 struct Args {
-    file: String,
+    file: Option<String>,
 }
 
 #[derive(Debug)]
@@ -92,16 +92,16 @@ fn interpret(content: String) {
             b'-' => interp.decrease(),
             b'.' => {
                 if interp.print().is_err() {
-                    panic!("Failed to print at position {}", p);
+                    panic!("Failed to print at position {p}");
                 }
             }
             b',' => {
                 if interp.read().is_err() {
-                    panic!("Failed to read at position {}", p);
+                    panic!("Failed to read at position {p}");
                 }
             }
             b'[' => {
-                let nxt = find_nxt(p).unwrap_or_else(|| panic!("Unmatched '[' at position {}", p));
+                let nxt = find_nxt(p).unwrap_or_else(|| panic!("Unmatched '[' at position {p}"));
                 if interp.has_value() {
                     bstack.push(p);
                 } else {
@@ -112,7 +112,7 @@ fn interpret(content: String) {
                 if interp.has_value() {
                     p = *bstack
                         .last()
-                        .unwrap_or_else(|| panic!("Unmatched ']' at position {}", p));
+                        .unwrap_or_else(|| panic!("Unmatched ']' at position {p}"));
                 } else {
                     bstack.pop();
                 }
@@ -123,14 +123,35 @@ fn interpret(content: String) {
     }
 }
 
-fn main() -> Result<()> {
+fn repl() -> Result<()> {
+    let stdin = io::stdin();
+    let mut stdout = io::stdout();
+    let mut line = String::new();
+
+    loop {
+        line.clear();
+        write!(stdout, ">>> ")?; // Print prompt
+        stdout.flush()?;
+        if stdin.read_line(&mut line)? == 0 {
+            break; // EOF
+        }
+        interpret(line.clone());
+    }
+    Ok(())
+}
+
+fn main() {
     let args = Args::parse();
 
-    if let Ok(content) = fs::read_to_string(&args.file) {
-        interpret(content);
+    if let Some(file) = args.file {
+        if let Ok(content) = fs::read_to_string(&file) {
+            interpret(content);
+        } else {
+            panic!("Failed to read file {file}");
+        }
     } else {
-        panic!("Failed to read file {}", args.file);
+        if let Err(err) = repl() {
+            panic!("REPL error: {err}");
+        }
     }
-
-    Ok(())
 }
