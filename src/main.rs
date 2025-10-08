@@ -63,8 +63,12 @@ impl Interpreter {
     }
 }
 
-fn interpret(content: String) {
-    let mut interp = Interpreter::new();
+fn interpret(content: String, op_interp: Option<&mut Interpreter>) {
+    let interp = if op_interp.is_none() {
+        &mut Interpreter::new()
+    } else {
+        op_interp.unwrap()
+    };
     let mut bstack = Vec::<usize>::new();
 
     let n = content.len();
@@ -127,6 +131,7 @@ fn repl() -> Result<()> {
     let stdin = io::stdin();
     let mut stdout = io::stdout();
     let mut line = String::new();
+    let mut interp = Interpreter::new();
 
     loop {
         line.clear();
@@ -135,7 +140,7 @@ fn repl() -> Result<()> {
         if stdin.read_line(&mut line)? == 0 {
             break; // EOF
         }
-        interpret(line.clone());
+        interpret(line.clone(), Some(&mut interp));
     }
     Ok(())
 }
@@ -145,7 +150,7 @@ fn main() {
 
     if let Some(file) = args.file {
         if let Ok(content) = fs::read_to_string(&file) {
-            interpret(content);
+            interpret(content, None);
         } else {
             panic!("Failed to read file {file}");
         }
